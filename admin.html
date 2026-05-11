@@ -1,0 +1,2525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #171b25;
+  --surface2:  #1e2333;
+  --border:    #2a3050;
+  --accent:    #4f8ef7;
+  --accent2:   #7c5cfc;
+  --danger:    #e05c5c;
+  --success:   #4caf82;
+  --warning:   #f0a04b;
+  --text:      #e8ecf5;
+  --muted:     #6b7594;
+  --mono:      'DM Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 56px 1fr;
+}
+
+/* ── Top bar ── */
+#topbar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+#topbar .logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  flex: 1;
+}
+#topbar .logo span { color: var(--muted); }
+#topbar-user { font-size: 13px; color: var(--muted); }
+#topbar-user strong { color: var(--text); }
+#btn-logout {
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
+}
+#btn-logout:hover { border-color: var(--danger); color: var(--danger); background: rgba(224,92,92,.08); }
+
+/* ── Sidebar ── */
+nav {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nav-section {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 14px 10px 6px;
+}
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all .15s;
+}
+.nav-btn:hover  { background: var(--surface2); color: var(--text); }
+.nav-btn.active { background: rgba(79,142,247,.12); color: var(--accent); }
+.nav-btn .icon  { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+/* ── Main ── */
+main { padding: 32px; overflow-y: auto; }
+.page { display: none; }
+.page.active { display: block; }
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.page-header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* ── Buttons ── */
+.btn {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #3a7ae0; }
+.btn-danger  { background: rgba(224,92,92,.15); color: var(--danger); border: 1px solid rgba(224,92,92,.3); }
+.btn-danger:hover  { background: rgba(224,92,92,.25); }
+.btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover   { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ── Card / Table ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+td {
+  padding: 14px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(79,142,247,.12);
+  color: var(--accent);
+  margin: 2px;
+}
+.tag-none { color: var(--muted); font-style: italic; font-size: 12px; }
+
+/* ── Modal ── */
+.modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop.visible { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 540px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,.6);
+}
+.modal-header {
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h2 { font-size: 17px; font-weight: 600; }
+.modal-close {
+  background: none; border: none; color: var(--muted);
+  font-size: 20px; cursor: pointer; line-height: 1; padding: 4px;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body   { padding: 24px 28px; }
+.modal-footer { padding: 16px 28px 24px; display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ── Form ── */
+.form-group { margin-bottom: 18px; }
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 7px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+.form-group input[type=text],
+.form-group input[type=email],
+.form-group input[type=password],
+.form-group input[type=number],
+.form-group input[type=color],
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 10px 14px;
+  transition: border-color .15s;
+  outline: none;
+}
+.form-group input[type=color] { padding: 4px 8px; height: 40px; cursor: pointer; }
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus { border-color: var(--accent); }
+.form-group textarea { resize: vertical; min-height: 80px; }
+.form-group input:disabled { opacity: .45; cursor: not-allowed; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.perm-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .15s;
+  user-select: none;
+  background: var(--bg);
+  color: var(--text);
+}
+.perm-chip input { display: none; }
+.perm-chip:hover { border-color: var(--accent); }
+.perm-chip.checked {
+  background: rgba(79,142,247,.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.perm-chip.curator-checked {
+  background: rgba(240,160,75,.15);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+/* ── Permission items with per-instrument restrictions ── */
+.perm-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  margin-bottom: 6px;
+  transition: border-color .15s;
+  overflow: hidden;
+}
+.perm-item.checked { border-color: var(--accent); }
+.perm-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.perm-item-header input[type=checkbox] { cursor: pointer; accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+.perm-item-header .perm-item-name { font-size: 13px; flex: 1; }
+.perm-item-header .perm-item-hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.perm-item-restrictions {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(79,142,247,.04);
+}
+.perm-item-restrictions.visible { display: grid; }
+.perm-item-restrictions .restrict-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 5px;
+}
+.perm-item-restrictions input[type=number] {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color .15s;
+}
+.perm-item-restrictions input[type=number]:focus { border-color: var(--accent); }
+
+.form-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Operational toggle ── */
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 11px 14px;
+}
+.toggle-row .toggle-label    { font-size: 14px; color: var(--text); }
+.toggle-row .toggle-sublabel { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { display: none; }
+.toggle-track {
+  position: absolute; inset: 0; background: var(--border);
+  border-radius: 12px; cursor: pointer; transition: background .2s;
+}
+.toggle-track::after {
+  content: ""; position: absolute; left: 3px; top: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; transition: transform .2s;
+}
+.toggle-switch input:checked + .toggle-track { background: var(--success); }
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(20px); }
+
+/* ── Login ── */
+#login-screen {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.login-box {
+  width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 32px 80px rgba(0,0,0,.5);
+}
+.login-box .login-logo {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.login-box h1 { font-size: 22px; font-weight: 600; margin-bottom: 28px; letter-spacing: -.02em; }
+.login-box .form-group { margin-bottom: 14px; }
+.login-box input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 11px 14px;
+  outline: none;
+  transition: border-color .15s;
+}
+.login-box input:focus { border-color: var(--accent); }
+#login-submit {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  text-align: center;
+}
+#login-submit:hover { background: #3a7ae0; }
+#login-submit:disabled { opacity: .5; cursor: not-allowed; }
+.login-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 12px;
+  min-height: 18px;
+  text-align: center;
+}
+
+/* ── Misc ── */
+.empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 14px; }
+
+.badge-admin {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(124,92,252,.2);
+  color: var(--accent2);
+  border: 1px solid rgba(124,92,252,.3);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.badge-curator {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(240,160,75,.2);
+  color: var(--warning);
+  border: 1px solid rgba(240,160,75,.3);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.perm-scope-note {
+  font-size: 12px;
+  color: var(--warning);
+  background: rgba(240,160,75,.08);
+  border: 1px solid rgba(240,160,75,.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-family: var(--mono);
+  letter-spacing: .01em;
+}
+
+.alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+.alert-error   { background: rgba(224,92,92,.12); border: 1px solid rgba(224,92,92,.3); color: #f08080; }
+.alert-success { background: rgba(76,175,130,.12); border: 1px solid rgba(76,175,130,.3); color: var(--success); }
+.alert-warning { background: rgba(240,160,75,.12); border: 1px solid rgba(240,160,75,.3); color: var(--warning); }
+
+#toast {
+  position: fixed;
+  bottom: 28px; right: 28px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 20px;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  z-index: 500;
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all .25s;
+  max-width: 360px;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.ok  { border-color: rgba(76,175,130,.4);  color: var(--success); }
+#toast.err { border-color: rgba(224,92,92,.4);   color: var(--danger);  }
+
+a.mailto-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+a.mailto-link:hover { text-decoration: underline; }
+
+.btn-report { background: rgba(79,142,247,.12); color: var(--accent); border: 1px solid rgba(79,142,247,.3); }
+.btn-report:hover { background: rgba(79,142,247,.22); }
+
+.format-pick {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+.format-btn {
+  flex: 1;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+}
+.format-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,.06); }
+.format-btn .fmt-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+.format-btn .fmt-label { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* ═══════════════════════════════════════════
+   MOBILE  (≤ 700px)
+═══════════════════════════════════════════ */
+@media (max-width: 700px) {
+
+  /* ── Layout ── */
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 48px 1fr 58px;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  #topbar { padding: 0 14px; gap: 8px; }
+  #topbar .logo { font-size: 11px; }
+  #topbar-user  { display: none; }
+
+  /* ── Sidebar → bottom tab bar ── */
+  nav {
+    grid-row: 3;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
+  }
+  .nav-section { display: none; }
+
+  .nav-btn {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px;
+    border-radius: 0;
+    font-size: 11px;
+    height: 100%;
+  }
+  .nav-btn .icon { font-size: 20px; width: auto; }
+  .nav-btn.active {
+    background: rgba(79,142,247,.15);
+    border-top: 2px solid var(--accent);
+    color: var(--accent);
+    border-left: none;
+  }
+
+  /* ── Main ── */
+  main {
+    grid-row: 2;
+    padding: 16px 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+  }
+  .page-header h1 { font-size: 18px; }
+  .page-header .btn { width: 100%; justify-content: center; }
+
+  /* ── Tables: horizontal scroll ── */
+  .card { border-radius: 8px; overflow: hidden; }
+  .card table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th { padding: 10px 12px; font-size: 10px; }
+  td { padding: 12px 12px; font-size: 12px; white-space: nowrap; }
+
+  /* Hide lower-priority columns on the Users table */
+  /* Col order: Name | Email | Role | Permissions | Actions */
+  #users-tbody tr td:nth-child(3),
+  #page-users thead tr th:nth-child(3) { display: none; }
+
+  /* Hide lower-priority columns on the Instruments table */
+  /* Col order: Order | Name | Description | Status | Actions */
+  #instruments-tbody tr td:nth-child(1),
+  #instruments-tbody tr td:nth-child(3),
+  #page-instruments thead tr th:nth-child(1),
+  #page-instruments thead tr th:nth-child(3) { display: none; }
+
+  td:last-child { white-space: normal !important; text-align: right; }
+  td:last-child .btn-sm { display: inline-block; margin: 2px 0 2px 4px; }
+
+  /* ── Modals → full-width bottom sheet ── */
+  .modal-backdrop { align-items: flex-end; padding: 0; }
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 90dvh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+  }
+  .modal-header { padding: 18px 20px 14px; }
+  .modal-body   { padding: 16px 20px; }
+  .modal-footer { padding: 12px 20px 24px; gap: 8px; }
+  .modal-footer .btn { flex: 1; justify-content: center; }
+
+  /* ── Form rows → single column ── */
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+  .perm-item-restrictions { grid-template-columns: 1fr; }
+
+  /* ── Login box ── */
+  .login-box {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 16px;
+    padding: 28px 24px;
+  }
+  .login-box h1 { font-size: 20px; margin-bottom: 20px; }
+
+  /* ── Toast ── */
+  #toast { bottom: 70px; right: 12px; left: 12px; max-width: none; text-align: center; }
+
+  /* ── Report format picker ── */
+  .format-pick { gap: 8px; }
+  .format-btn  { padding: 12px 8px; }
+  .format-btn .fmt-icon { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Lab System</div>
+    <h1>Admin Console</h1>
+    <div class="form-group">
+      <label>Email</label>
+      <input id="login-email" type="email" placeholder="admin@example.com" autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin()" />
+    </div>
+    <button id="login-submit" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── Shell ── -->
+<div id="topbar">
+  <div class="logo">Lab System <span>/ Admin</span></div>
+  <span id="topbar-user"></span>
+  <button id="btn-logout" onclick="doLogout()">Logout</button>
+</div>
+
+<nav>
+  <div class="nav-section">Manage</div>
+  <button class="nav-btn active" data-page="users" onclick="switchPage('users')">
+    <span class="icon">👤</span> Users
+  </button>
+  <button class="nav-btn" data-page="instruments" onclick="switchPage('instruments')">
+    <span class="icon">🔬</span> Instruments
+  </button>
+</nav>
+
+<main>
+
+  <!-- ── Users page ── -->
+  <div id="page-users" class="page active">
+    <div class="page-header">
+      <div>
+        <h1>Users</h1>
+        <p>Manage researcher accounts, permissions and passwords</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddUser()">＋ Add User</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Auth Email</th>
+            <th>Role</th>
+            <th>Instrument Permissions</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody">
+          <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Instruments page ── -->
+  <div id="page-instruments" class="page">
+    <div class="page-header">
+      <div>
+        <h1>Instruments</h1>
+        <p>Add, edit or remove lab instruments</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddInstrument()">＋ Add Instrument</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Curator</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="instruments-tbody">
+          <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<!-- ── Modal: Add/Edit User ── -->
+<div id="modal-user" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-user-title">Add User</h2>
+      <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-user-alert"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Display Name</label>
+          <input id="u-name" type="text" placeholder="Dr. Smith" />
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input id="u-email" type="email" placeholder="smith@lab.ac.uk" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input id="u-password" type="password" placeholder="Min 8 characters" />
+        <div class="form-hint" id="u-pw-hint"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Role</label>
+        <select id="u-role" onchange="onRoleChange()">
+          <option value="user">User — standard researcher</option>
+          <option value="curator">Curator — manages designated instruments</option>
+          <option value="administrator">Administrator — full system access</option>
+        </select>
+      </div>
+
+      <hr class="form-divider">
+
+      <!-- Shown when role = "user" -->
+      <div id="u-permissions-section">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Instrument Permissions
+            <span style="font-family:var(--sans);font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px">
+              — tick to grant access; set optional booking restrictions below each
+            </span>
+          </label>
+          <div id="u-permissions" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- Shown when role = "curator" -->
+      <div id="u-curator-section" style="display:none">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Managed Instruments
+            <span style="font-family:var(--sans);font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px">
+              — instruments this curator can edit &amp; report on
+            </span>
+          </label>
+          <div class="checkbox-group" id="u-curators" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- Shown when role = "curator" — user-level access on non-curated instruments -->
+      <div id="u-curator-extra-section" style="display:none">
+        <hr class="form-divider">
+        <div class="form-group" style="margin-bottom:0">
+          <label>User Access to Other Instruments
+            <span style="font-family:var(--sans);font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px">
+              — instruments this curator can also book as a regular user
+            </span>
+          </label>
+          <div id="u-permissions-extra" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user')">Cancel</button>
+      <button class="btn btn-primary" id="u-save-btn" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Add/Edit Instrument ── -->
+<div id="modal-instrument" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-instr-title">Add Instrument</h2>
+      <button class="modal-close" onclick="closeModal('modal-instrument')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-instr-alert"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Instrument ID</label>
+          <input id="i-id" type="text" placeholder="sem-1" />
+          <div class="form-hint">Unique slug, no spaces. Cannot be changed after creation.</div>
+        </div>
+        <div class="form-group">
+          <label>Display Name</label>
+          <input id="i-name" type="text" placeholder="SEM 1" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="i-description" placeholder="Brief description shown in the booking system…"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Operational Status</label>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label" id="i-operational-label">Instrument is operational</div>
+            <div class="toggle-sublabel">Turn off to mark this instrument as unavailable</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="i-operational" checked onchange="updateOperationalLabel()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="i-notes" placeholder="Notes about current operational status…"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Sort Order</label>
+        <input id="i-sortorder" type="number" min="1" placeholder="e.g. 1" />
+        <div class="form-hint">Lower numbers appear first</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-instrument')">Cancel</button>
+      <button class="btn btn-primary" id="i-save-btn" onclick="saveInstrument()">Save Instrument</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: User Usage Report ── -->
+<div id="modal-user-report" class="modal-backdrop">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <h2 id="user-report-title">User Report</h2>
+      <button class="modal-close" onclick="closeModal('modal-user-report')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="user-report-scope" class="perm-scope-note" style="display:none"></div>
+      <div class="form-row" style="margin-bottom:18px">
+        <div class="form-group" style="margin-bottom:0">
+          <label>From date</label>
+          <input id="user-report-from" type="date" />
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>To date</label>
+          <input id="user-report-to" type="date" />
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:4px">
+        <label>Download format</label>
+      </div>
+      <div class="format-pick">
+        <button class="format-btn" onclick="generateUserReport('csv')">
+          <span class="fmt-icon">📊</span>
+          CSV
+          <div class="fmt-label">Open in Excel</div>
+        </button>
+        <button class="format-btn" onclick="generateUserReport('pdf')">
+          <span class="fmt-icon">📄</span>
+          PDF
+          <div class="fmt-label">Print-ready report</div>
+        </button>
+      </div>
+      <div id="user-report-alert" style="margin-top:14px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user-report')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Usage Report ── -->
+<div id="modal-report" class="modal-backdrop">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <h2 id="report-title">Usage Report</h2>
+      <button class="modal-close" onclick="closeModal('modal-report')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row" style="margin-bottom:18px">
+        <div class="form-group" style="margin-bottom:0">
+          <label>From date</label>
+          <input id="report-from" type="date" />
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>To date</label>
+          <input id="report-to" type="date" />
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:4px">
+        <label>Download format</label>
+      </div>
+      <div class="format-pick">
+        <button class="format-btn" onclick="generateReport('csv')">
+          <span class="fmt-icon">📊</span>
+          CSV
+          <div class="fmt-label">Open in Excel</div>
+        </button>
+        <button class="format-btn" onclick="generateReport('pdf')">
+          <span class="fmt-icon">📄</span>
+          PDF
+          <div class="fmt-label">Print-ready report</div>
+        </button>
+      </div>
+      <div id="report-alert" style="margin-top:14px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-report')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Curator — Edit User Permissions ── -->
+<div id="modal-curator-perm" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="curator-perm-title">Edit Permissions</h2>
+      <button class="modal-close" onclick="closeModal('modal-curator-perm')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-curator-perm-alert"></div>
+      <p id="curator-perm-scope" class="perm-scope-note" style="display:none"></p>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Instrument Access
+          <span style="font-family:var(--sans);font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px">
+            — your managed instruments only
+          </span>
+        </label>
+        <div id="curator-perm-items" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-curator-perm')">Cancel</button>
+      <button class="btn btn-primary" id="curator-perm-save-btn" onclick="saveUserPermissions()">Save Permissions</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Confirm Delete ── -->
+<div id="modal-confirm" class="modal-backdrop">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <h2 id="confirm-title">Confirm Delete</h2>
+      <button class="modal-close" onclick="closeModal('modal-confirm')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-message" style="font-size:14px;line-height:1.6;color:var(--muted)"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+//  KEYS
+// ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL     = "https://otaakexhfeqtxuogiybg.supabase.co";
+const ANON_KEY         = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90YWFrZXhoZmVxdHh1b2dpeWJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzkzNzksImV4cCI6MjA5MzkxNTM3OX0.MZGN223xrG9d1wYk63D2MT85ncjxqUqEQqiH9dZYvs8";
+const SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90YWFrZXhoZmVxdHh1b2dpeWJnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODMzOTM3OSwiZXhwIjoyMDkzOTE1Mzc5fQ.Y6d9REQhFpbg2tY3y1AD3eNkbw6dUGw3s5VBkw6wNnI";
+
+const sb = supabase.createClient(SUPABASE_URL, ANON_KEY);
+const sbAdmin = supabase.createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+
+const REST = SUPABASE_URL + "/rest/v1";
+const HEADERS = {
+  "apikey":        ANON_KEY,
+  "Authorization": `Bearer ${ANON_KEY}`,
+  "Content-Type":  "application/json",
+  "Prefer":        "return=representation"
+};
+
+let currentAdminUser           = null;
+let currentUserIsCurator       = false;   // true when logged in as curator (not full admin)
+let currentUserCuratorInstrIds = [];      // instrument IDs this curator manages
+let allUsers          = [];
+let allAuthUsers      = [];
+let allInstruments    = [];
+let allPermissions    = [];
+let allCurators       = [];
+let allAdministrators = [];
+let allBookings       = [];
+
+let editingUserId  = null;
+let editingInstrId = null;
+
+// ═══════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════
+
+async function doLogin() {
+  const email    = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl    = document.getElementById("login-error");
+  const btn      = document.getElementById("login-submit");
+
+  errEl.textContent = "";
+  btn.disabled = true;
+  btn.textContent = "Signing in…";
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    errEl.textContent = error.message;
+    btn.disabled = false; btn.textContent = "Sign In";
+    return;
+  }
+
+  // Verify role
+  const res  = await fetch(`${REST}/users?id=eq.${data.user.id}&select=*`, { headers: HEADERS });
+  const rows = await res.json();
+
+  if (!rows.length) {
+    errEl.textContent = "No researcher account linked to this login.";
+    await sb.auth.signOut();
+    btn.disabled = false; btn.textContent = "Sign In";
+    return;
+  }
+
+  const userRow = rows[0];
+
+  // Check administrators table
+  const adminRes  = await fetch(`${REST}/administrators?user_id=eq.${encodeURIComponent(userRow.id)}&select=*`, { headers: HEADERS });
+  const adminRows = await adminRes.json();
+
+  if (adminRows.length) {
+    // Full administrator
+    currentUserIsCurator       = false;
+    currentUserCuratorInstrIds = [];
+  } else {
+    // Check curators table
+    const curRes  = await fetch(`${REST}/curators?user_id=eq.${encodeURIComponent(userRow.id)}&select=*`, { headers: HEADERS });
+    const curRows = await curRes.json();
+
+    if (!curRows.length) {
+      errEl.textContent = "Access denied — administrator or curator privileges required.";
+      await sb.auth.signOut();
+      btn.disabled = false; btn.textContent = "Sign In";
+      return;
+    }
+
+    currentUserIsCurator       = true;
+    currentUserCuratorInstrIds = curRows.map(r => r.instrument_id);
+  }
+
+  currentAdminUser = { ...userRow, email: data.user.email };
+  const roleLabel = currentUserIsCurator
+    ? " <span class='badge-curator'>Curator</span>"
+    : " <span class='badge-admin'>Admin</span>";
+  document.getElementById("topbar-user").innerHTML =
+    `Logged in as <strong>${esc(currentAdminUser.name)}</strong>${roleLabel}`;
+  document.getElementById("login-screen").style.display = "none";
+  btn.disabled = false; btn.textContent = "Sign In";
+
+  await loadAll();
+  applyRoleUI();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentAdminUser           = null;
+  currentUserIsCurator       = false;
+  currentUserCuratorInstrIds = [];
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("login-password").value = "";
+  document.getElementById("login-error").textContent = "";
+}
+
+// ═══════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════
+
+async function apiGet(path) {
+  const r = await fetch(`${REST}/${path}`, { headers: HEADERS });
+  const j = await r.json();
+  return Array.isArray(j) ? j : [];
+}
+
+async function loadAll() {
+  const [users, instruments, permissions, curators, administrators, bookings, authResult] = await Promise.all([
+    apiGet("users?select=*"),
+    apiGet("instruments?select=*&order=sortorder.asc.nullslast,name.asc"),
+    apiGet("permissions?select=*"),
+    apiGet("curators?select=*"),
+    apiGet("administrators?select=*"),
+    apiGet("bookings?select=*"),
+    sbAdmin.auth.admin.listUsers({ perPage: 1000 })
+  ]);
+
+  allUsers          = users;
+  allInstruments    = instruments;
+  allPermissions    = permissions;
+  allCurators       = curators;
+  allAdministrators = administrators;
+  allBookings       = bookings;
+  allAuthUsers      = authResult?.data?.users ?? [];
+
+  renderUsers();
+  renderInstruments();
+}
+
+// ═══════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════
+
+function switchPage(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(`page-${page}`).classList.add("active");
+  document.querySelector(`[data-page="${page}"]`).classList.add("active");
+}
+
+// ═══════════════════════════════════════════
+//  ROLE UI — show/hide elements based on role
+// ═══════════════════════════════════════════
+
+function applyRoleUI() {
+  const isCurator = currentUserIsCurator;
+
+  // Curators can see both pages; they land on Instruments
+  if (isCurator) {
+    switchPage("instruments");
+    document.querySelector('[data-page="users"]').style.display  = "";
+    document.querySelector('[data-page="instruments"]').style.display = "";
+  } else {
+    document.querySelector('[data-page="users"]').style.display  = "";
+    document.querySelector('[data-page="instruments"]').style.display = "";
+  }
+
+  // "Add User" button — hidden for curators
+  const addUserBtn = document.querySelector('#page-users .btn-primary');
+  if (addUserBtn) addUserBtn.style.display = isCurator ? "none" : "";
+
+  // "Add Instrument" button — hidden for curators
+  const addInstrBtn = document.querySelector('#page-instruments .btn-primary');
+  if (addInstrBtn) addInstrBtn.style.display = isCurator ? "none" : "";
+}
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+
+let toastTimer;
+function toast(msg, type = "ok") {
+  const el = document.getElementById("toast");
+  el.textContent = (type === "ok" ? "✓  " : "✕  ") + msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ""; }, 3500);
+}
+
+// ═══════════════════════════════════════════
+//  MODALS
+// ═══════════════════════════════════════════
+
+function openModal(id)  { document.getElementById(id).classList.add("visible"); }
+function closeModal(id) { document.getElementById(id).classList.remove("visible"); }
+
+function setModalAlert(containerId, msg, type = "error") {
+  document.getElementById(containerId).innerHTML =
+    msg ? `<div class="alert alert-${type}">${msg}</div>` : "";
+}
+
+// ═══════════════════════════════════════════
+//  USERS — RENDER
+// ═══════════════════════════════════════════
+
+function getAuthEmail(userId) {
+  const au = allAuthUsers.find(u => u.id === userId);
+  return au?.email ?? null;
+}
+
+function getUserRole(userId) {
+  if (allAdministrators.some(a => a.user_id === userId)) return "administrator";
+  if (allCurators.some(c => c.user_id === userId))       return "curator";
+  return "user";
+}
+
+function renderUsers() {
+  const tbody = document.getElementById("users-tbody");
+
+  if (!allUsers.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No users found.</td></tr>`;
+    return;
+  }
+
+  const sorted = [...allUsers].sort((a, b) => {
+    const ra = getUserRole(a.id), rb = getUserRole(b.id);
+    const order = { administrator: 0, curator: 1, user: 2 };
+    if (order[ra] !== order[rb]) return order[ra] - order[rb];
+    return (a.name || "").localeCompare(b.name || "");
+  });
+
+  tbody.innerHTML = sorted.map(u => {
+    const email = getAuthEmail(u.id);
+    const emailCell = email
+      ? `<a class="mailto-link" href="mailto:${esc(email)}">${esc(email)}</a>`
+      : `<span class="tag-none">—</span>`;
+
+    const role = getUserRole(u.id);
+    const roleBadge = role === "administrator"
+      ? `<span class="badge-admin" style="margin-left:8px">Admin</span>`
+      : role === "curator"
+        ? `<span class="badge-curator" style="margin-left:8px">Curator</span>`
+        : "";
+
+    const roleLabel = role === "administrator" ? "Administrator"
+      : role === "curator" ? "Curator" : "Researcher";
+
+    // Build instrument tags — always show full picture
+    let instrTags = "";
+    if (role === "administrator") {
+      instrTags = `<span class="tag-none" style="font-style:normal">All instruments</span>`;
+    } else {
+      // Curator assignments (amber)
+      const curatorInstrs = allCurators.filter(c => c.user_id === u.id);
+      const curatorTags = curatorInstrs.map(c => {
+        const ins = allInstruments.find(i => i.id === c.instrument_id);
+        return ins
+          ? `<span class="tag" style="background:rgba(240,160,75,.15);color:var(--warning);border:1px solid rgba(240,160,75,.3)">🔧 ${esc(ins.name)}</span>`
+          : "";
+      }).join("");
+
+      // User-level permissions (blue) — exclude instruments already covered by curator role
+      const curatedSet = new Set(curatorInstrs.map(c => c.instrument_id));
+      const userPerms = allPermissions.filter(p => p.user_id === u.id && !curatedSet.has(p.instrument_id));
+      const permTags = userPerms.map(p => {
+        const ins = allInstruments.find(i => i.id === p.instrument_id);
+        if (!ins) return "";
+        const parts = [];
+        if (p.maxslot)     parts.push(`${p.maxslot}h`);
+        if (p.advancedays) parts.push(`${p.advancedays}d`);
+        const hint = parts.length
+          ? `<span style="opacity:.55;margin-left:3px">${parts.join("·")}</span>`
+          : "";
+        return `<span class="tag">${esc(ins.name)}${hint}</span>`;
+      }).join("");
+
+      instrTags = curatorTags + permTags;
+      if (!instrTags) instrTags = `<span class="tag-none">No permissions</span>`;
+    }
+
+    // Action buttons differ by who is logged in
+    let actionBtns;
+    if (currentUserIsCurator) {
+      // Curators cannot edit permissions for administrators, nor their own
+      const canEditPerms = role !== "administrator" && u.id !== currentAdminUser.id;
+      actionBtns = `
+        ${canEditPerms ? `<button class="btn btn-ghost btn-sm"
+                onclick="openEditUserPermissions('${esc(u.id)}')">Edit Permissions</button>` : ""}
+        <button class="btn btn-report btn-sm" style="margin-left:6px" onclick="openUserReport('${esc(u.id)}')">Usage Report</button>`;
+    } else {
+      actionBtns = `
+        <button class="btn btn-ghost btn-sm" onclick="openEditUser('${esc(u.id)}')">Edit</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:6px"
+                onclick="confirmDeleteUser('${esc(u.id)}')">Delete</button>
+        <button class="btn btn-report btn-sm" style="margin-left:6px" onclick="openUserReport('${esc(u.id)}')">Usage Report</button>`;
+    }
+
+    return `<tr>
+      <td><strong>${esc(u.name)}</strong>${roleBadge}</td>
+      <td>${emailCell}</td>
+      <td style="color:var(--muted);font-size:12px">${roleLabel}</td>
+      <td>${instrTags}</td>
+      <td style="text-align:right;white-space:nowrap">${actionBtns}
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ═══════════════════════════════════════════
+//  USERS — ROLE MODAL SECTION TOGGLE
+// ═══════════════════════════════════════════
+
+function onRoleChange() {
+  const role = document.getElementById("u-role").value;
+  document.getElementById("u-permissions-section").style.display      = role === "user"    ? "" : "none";
+  document.getElementById("u-curator-section").style.display          = role === "curator" ? "" : "none";
+  document.getElementById("u-curator-extra-section").style.display    = role === "curator" ? "" : "none";
+
+  if (role === "curator") {
+    // Build extra permissions for instruments NOT currently selected as curator instruments
+    const curatedIds = [...document.querySelectorAll("#u-curators input:checked")].map(el => el.value);
+    const otherIds   = allInstruments.filter(i => !curatedIds.includes(i.id)).map(i => i.id);
+    buildPermItemsInto("u-permissions-extra", editingUserId, otherIds, "permx-");
+  }
+}
+
+// ═══════════════════════════════════════════
+//  USERS — OPEN ADD
+// ═══════════════════════════════════════════
+
+function openAddUser() {
+  editingUserId = null;
+
+  document.getElementById("modal-user-title").textContent = "Add User";
+  document.getElementById("u-save-btn").textContent       = "Create User";
+  document.getElementById("u-name").value     = "";
+  document.getElementById("u-email").value    = "";
+  document.getElementById("u-email").disabled = false;
+  document.getElementById("u-password").value = "";
+  document.getElementById("u-pw-hint").textContent =
+    "Required. The user can change this after logging in.";
+  document.getElementById("u-role").value = "user";
+  onRoleChange();
+
+  setModalAlert("modal-user-alert", "");
+  buildPermItemsInto("u-permissions", null, null, "perm-");
+  buildPermItemsInto("u-permissions-extra", null, allInstruments.map(i => i.id), "permx-");
+  buildCuratorChips(null);
+  openModal("modal-user");
+  setTimeout(() => document.getElementById("u-name").focus(), 60);
+}
+
+// ═══════════════════════════════════════════
+//  USERS — OPEN EDIT
+// ═══════════════════════════════════════════
+
+function openEditUser(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+
+  editingUserId = userId;
+
+  const role = getUserRole(userId);
+  // Instruments this user currently curates (used to exclude from extra section)
+  const curatedIds = allCurators.filter(c => c.user_id === userId).map(c => c.instrument_id);
+  const otherIds   = allInstruments.filter(i => !curatedIds.includes(i.id)).map(i => i.id);
+
+  document.getElementById("modal-user-title").textContent = "Edit User";
+  document.getElementById("u-save-btn").textContent       = "Save Changes";
+  document.getElementById("u-name").value     = u.name || "";
+  document.getElementById("u-email").value    = getAuthEmail(userId) || "";
+  document.getElementById("u-email").disabled = true;
+  document.getElementById("u-password").value = "";
+  document.getElementById("u-pw-hint").textContent =
+    "Leave blank to keep the current password.";
+  document.getElementById("u-role").value = role;
+  onRoleChange();
+
+  setModalAlert("modal-user-alert", "");
+  buildPermItemsInto("u-permissions", userId, null, "perm-");
+  buildPermItemsInto("u-permissions-extra", userId, otherIds, "permx-");
+  buildCuratorChips(userId);
+  openModal("modal-user");
+  setTimeout(() => document.getElementById("u-name").focus(), 60);
+}
+
+// ═══════════════════════════════════════════
+//  PERMISSION ITEMS — GENERIC BUILDER
+//  containerId : element to fill
+//  userId      : pre-populate from existing permissions (null = new user)
+//  instrIds    : array of instrument IDs to show (null = all)
+//  prefix      : CSS-id prefix e.g. "perm-" / "permx-" / "permc-"
+// ═══════════════════════════════════════════
+
+function buildPermItemsInto(containerId, userId, instrIds, prefix) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const instrs = instrIds
+    ? allInstruments.filter(i => instrIds.includes(i.id))
+    : allInstruments;
+
+  if (!instrs.length) {
+    container.innerHTML =
+      `<span style="color:var(--muted);font-size:13px">No instruments available.</span>`;
+    return;
+  }
+
+  const existingPerms = userId
+    ? allPermissions.filter(p => p.user_id === userId)
+    : [];
+
+  container.innerHTML = instrs.map(i => {
+    const perm        = existingPerms.find(p => p.instrument_id === i.id);
+    const checked     = !!perm;
+    const maxslot     = perm?.maxslot     ?? "";
+    const advancedays = perm?.advancedays ?? "";
+    const hintParts   = [];
+    if (maxslot)     hintParts.push(`${maxslot}h`);
+    if (advancedays) hintParts.push(`${advancedays}d adv.`);
+    const hint = checked
+      ? (hintParts.length ? hintParts.join(" · ") : "Unrestricted")
+      : "";
+    const eid = CSS.escape(i.id);
+    return `
+    <div class="perm-item ${checked ? "checked" : ""}" id="${prefix}item-${eid}">
+      <label class="perm-item-header">
+        <input type="checkbox" value="${esc(i.id)}" ${checked ? "checked" : ""}
+               onchange="togglePermItemPrefixed(this,'${prefix}')">
+        <span class="perm-item-name">${esc(i.name)}</span>
+        <span class="perm-item-hint" id="${prefix}hint-${eid}">${esc(hint)}</span>
+      </label>
+      <div class="perm-item-restrictions ${checked ? "visible" : ""}" id="${prefix}restrict-${eid}">
+        <div>
+          <span class="restrict-label">Max future hours</span>
+          <input type="number" min="1" placeholder="Unlimited"
+                 id="${prefix}maxslot-${eid}" value="${esc(maxslot)}"
+                 oninput="updatePermHintPrefixed('${prefix}','${eid}')">
+        </div>
+        <div>
+          <span class="restrict-label">Advance booking (days)</span>
+          <input type="number" min="1" placeholder="Unlimited"
+                 id="${prefix}advdays-${eid}" value="${esc(advancedays)}"
+                 oninput="updatePermHintPrefixed('${prefix}','${eid}')">
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function togglePermItemPrefixed(input, prefix) {
+  const eid      = CSS.escape(input.value);
+  const item     = document.getElementById(`${prefix}item-${eid}`);
+  const restrict = document.getElementById(`${prefix}restrict-${eid}`);
+  if (item)     item.classList.toggle("checked", input.checked);
+  if (restrict) restrict.classList.toggle("visible", input.checked);
+  updatePermHintPrefixed(prefix, eid);
+}
+
+function updatePermHintPrefixed(prefix, eid) {
+  const msEl = document.getElementById(`${prefix}maxslot-${eid}`);
+  const adEl = document.getElementById(`${prefix}advdays-${eid}`);
+  const cbEl = document.querySelector(`#${prefix}item-${eid} input[type=checkbox]`);
+  const hint = document.getElementById(`${prefix}hint-${eid}`);
+  if (!hint) return;
+  if (!cbEl?.checked) { hint.textContent = ""; return; }
+  const parts = [];
+  if (msEl?.value) parts.push(`${msEl.value}h`);
+  if (adEl?.value) parts.push(`${adEl.value}d adv.`);
+  hint.textContent = parts.length ? parts.join(" · ") : "Unrestricted";
+}
+
+// ═══════════════════════════════════════════
+//  CURATOR CHIPS
+// ═══════════════════════════════════════════
+
+function buildCuratorChips(userId) {
+  const container = document.getElementById("u-curators");
+
+  if (!allInstruments.length) {
+    container.innerHTML =
+      `<span style="color:var(--muted);font-size:13px">No instruments defined yet.</span>`;
+    return;
+  }
+
+  const granted = new Set(
+    userId
+      ? allCurators.filter(c => c.user_id === userId).map(c => c.instrument_id)
+      : []
+  );
+
+  container.innerHTML = allInstruments.map(i => {
+    const checked = granted.has(i.id);
+    return `<label class="perm-chip ${checked ? "curator-checked" : ""}">
+      <input type="checkbox" value="${esc(i.id)}" ${checked ? "checked" : ""}
+             onchange="toggleCuratorChip(this)">
+      ${esc(i.name)}
+    </label>`;
+  }).join("");
+}
+
+function toggleCuratorChip(input) {
+  input.closest(".perm-chip").classList.toggle("curator-checked", input.checked);
+}
+
+// ═══════════════════════════════════════════
+//  USERS — SAVE
+// ═══════════════════════════════════════════
+
+async function saveUser() {
+  const name     = document.getElementById("u-name").value.trim();
+  const email    = document.getElementById("u-email").value.trim();
+  const password = document.getElementById("u-password").value;
+  const role     = document.getElementById("u-role").value;
+  const btn      = document.getElementById("u-save-btn");
+
+  setModalAlert("modal-user-alert", "");
+
+  if (!name) {
+    setModalAlert("modal-user-alert", "Display name is required.");
+    return;
+  }
+
+  btn.disabled = true;
+
+  if (!editingUserId) {
+    // ── CREATE ───────────────────────────────────────────────────
+    btn.textContent = "Creating…";
+
+    if (!email) {
+      setModalAlert("modal-user-alert", "Email address is required.");
+      btn.disabled = false; btn.textContent = "Create User"; return;
+    }
+    if (password.length < 8) {
+      setModalAlert("modal-user-alert", "Password must be at least 8 characters.");
+      btn.disabled = false; btn.textContent = "Create User"; return;
+    }
+
+    const { data: created, error: createErr } =
+      await sbAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true
+      });
+
+    if (createErr) {
+      setModalAlert("modal-user-alert", `Auth error: ${createErr.message}`);
+      btn.disabled = false; btn.textContent = "Create User"; return;
+    }
+
+    const authId = created.user.id;
+
+    const insertRes = await fetch(`${REST}/users`, {
+      method:  "POST",
+      headers: HEADERS,
+      body:    JSON.stringify({ id: authId, name, email })
+    });
+
+    if (!insertRes.ok) {
+      const err = await insertRes.json().catch(() => ({}));
+      setModalAlert("modal-user-alert",
+        `Auth user created but users-table insert failed: ${err.message || "unknown error"}`);
+      btn.disabled = false; btn.textContent = "Create User"; return;
+    }
+
+    await syncRoleEntries(authId, role);
+    if (role === "user") {
+      await syncPermissions(authId);
+    } else if (role === "curator") {
+      await syncCurators(authId);
+      const curatedIds = [...document.querySelectorAll("#u-curators input:checked")].map(el => el.value);
+      const otherIds   = allInstruments.filter(i => !curatedIds.includes(i.id)).map(i => i.id);
+      await syncPermissionsFromContainer(authId, "u-permissions-extra", "permx-", otherIds);
+    }
+    // Administrator: no permissions or curator entries needed
+    toast(`User "${name}" created`);
+
+  } else {
+    // ── UPDATE ───────────────────────────────────────────────────
+    btn.textContent = "Saving…";
+
+    const patchRes = await fetch(`${REST}/users?id=eq.${encodeURIComponent(editingUserId)}`, {
+      method:  "PATCH",
+      headers: HEADERS,
+      body:    JSON.stringify({ name })
+    });
+
+    if (!patchRes.ok) {
+      const err = await patchRes.json().catch(() => ({}));
+      setModalAlert("modal-user-alert", `Failed to update user: ${err.message || "unknown error"}`);
+      btn.disabled = false; btn.textContent = "Save Changes"; return;
+    }
+
+    if (password) {
+      if (password.length < 8) {
+        setModalAlert("modal-user-alert", "Password must be at least 8 characters.");
+        btn.disabled = false; btn.textContent = "Save Changes"; return;
+      }
+      const { error: pwErr } =
+        await sbAdmin.auth.admin.updateUserById(editingUserId, { password });
+
+      if (pwErr) {
+        setModalAlert("modal-user-alert",
+          `Details saved but password reset failed: ${pwErr.message}`);
+        btn.disabled = false; btn.textContent = "Save Changes";
+        await loadAll(); return;
+      }
+    }
+
+    await syncRoleEntries(editingUserId, role);
+
+    if (role === "user") {
+      // Full permission sync; remove curator entries
+      await syncPermissions(editingUserId);
+      await fetch(`${REST}/curators?user_id=eq.${encodeURIComponent(editingUserId)}`,
+        { method: "DELETE", headers: HEADERS });
+    } else if (role === "curator") {
+      // Sync curator assignments; sync extra user permissions on non-curated instruments
+      await syncCurators(editingUserId);
+      const curatedIds = [...document.querySelectorAll("#u-curators input:checked")].map(el => el.value);
+      const otherIds   = allInstruments.filter(i => !curatedIds.includes(i.id)).map(i => i.id);
+      await syncPermissionsFromContainer(editingUserId, "u-permissions-extra", "permx-", otherIds);
+      // Remove permissions for instruments the user is now curating (they have unrestricted access)
+      const curatedPerms = allPermissions.filter(
+        p => p.user_id === editingUserId && curatedIds.includes(p.instrument_id));
+      await Promise.all(curatedPerms.map(p =>
+        fetch(`${REST}/permissions?user_id=eq.${encodeURIComponent(editingUserId)}&instrument_id=eq.${encodeURIComponent(p.instrument_id)}`,
+          { method: "DELETE", headers: HEADERS })
+      ));
+    } else if (role === "administrator") {
+      // Admins have global access — clear granular entries
+      await fetch(`${REST}/permissions?user_id=eq.${encodeURIComponent(editingUserId)}`,
+        { method: "DELETE", headers: HEADERS });
+      await fetch(`${REST}/curators?user_id=eq.${encodeURIComponent(editingUserId)}`,
+        { method: "DELETE", headers: HEADERS });
+    }
+
+    toast(`User "${name}" updated`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = editingUserId ? "Save Changes" : "Create User";
+  closeModal("modal-user");
+  await loadAll();
+}
+
+// ═══════════════════════════════════════════
+//  ROLE ENTRIES — SYNC
+//  Manages the administrators table
+// ═══════════════════════════════════════════
+
+async function syncRoleEntries(userId, role) {
+  const isCurrentlyAdmin = allAdministrators.some(a => a.user_id === userId);
+  const shouldBeAdmin    = role === "administrator";
+
+  if (shouldBeAdmin && !isCurrentlyAdmin) {
+    await fetch(`${REST}/administrators`, {
+      method:  "POST",
+      headers: HEADERS,
+      body:    JSON.stringify({ user_id: userId })
+    });
+  } else if (!shouldBeAdmin && isCurrentlyAdmin) {
+    await fetch(
+      `${REST}/administrators?user_id=eq.${encodeURIComponent(userId)}`,
+      { method: "DELETE", headers: HEADERS }
+    );
+  }
+}
+
+// ═══════════════════════════════════════════
+//  PERMISSIONS — SYNC (generic)
+//  Reads checked instruments from `containerId`, using `prefix` to find
+//  the restriction inputs.  If `limitInstrIds` is supplied, only those
+//  instruments' permissions are touched (others are left unchanged).
+// ═══════════════════════════════════════════
+
+async function syncPermissionsFromContainer(userId, containerId, prefix, limitInstrIds) {
+  const selected = [...document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`)]
+    .map(el => el.value);
+
+  // Only look at the subset of the DB that this call is responsible for
+  const scope = limitInstrIds
+    ? allPermissions.filter(p => p.user_id === userId && limitInstrIds.includes(p.instrument_id))
+    : allPermissions.filter(p => p.user_id === userId);
+
+  const existingIds   = scope.map(p => p.instrument_id);
+  const scopeSelected = limitInstrIds ? selected.filter(id => limitInstrIds.includes(id)) : selected;
+
+  const toAdd    = scopeSelected.filter(id => !existingIds.includes(id));
+  const toRemove = existingIds.filter(id => !scopeSelected.includes(id));
+  const toUpdate = scopeSelected.filter(id =>  existingIds.includes(id));
+
+  const getRestrictions = instrId => {
+    const eid = CSS.escape(instrId);
+    const ms  = document.getElementById(`${prefix}maxslot-${eid}`)?.value;
+    const ad  = document.getElementById(`${prefix}advdays-${eid}`)?.value;
+    return { maxslot: ms ? parseInt(ms) : null, advancedays: ad ? parseInt(ad) : null };
+  };
+
+  const ops = [];
+
+  toAdd.forEach(instrId => {
+    const { maxslot, advancedays } = getRestrictions(instrId);
+    ops.push(fetch(`${REST}/permissions`, {
+      method: "POST", headers: HEADERS,
+      body: JSON.stringify({ user_id: userId, instrument_id: instrId, maxslot, advancedays })
+    }));
+  });
+
+  toRemove.forEach(instrId => {
+    ops.push(fetch(
+      `${REST}/permissions?user_id=eq.${encodeURIComponent(userId)}&instrument_id=eq.${encodeURIComponent(instrId)}`,
+      { method: "DELETE", headers: HEADERS }
+    ));
+  });
+
+  toUpdate.forEach(instrId => {
+    const { maxslot, advancedays } = getRestrictions(instrId);
+    const existingPerm = scope.find(p => p.instrument_id === instrId);
+    if (existingPerm &&
+        (existingPerm.maxslot !== maxslot || existingPerm.advancedays !== advancedays)) {
+      ops.push(fetch(
+        `${REST}/permissions?user_id=eq.${encodeURIComponent(userId)}&instrument_id=eq.${encodeURIComponent(instrId)}`,
+        { method: "PATCH", headers: HEADERS, body: JSON.stringify({ maxslot, advancedays }) }
+      ));
+    }
+  });
+
+  await Promise.all(ops);
+}
+
+// Convenience wrapper — full user role permissions (all instruments)
+async function syncPermissions(userId) {
+  await syncPermissionsFromContainer(userId, "u-permissions", "perm-", null);
+}
+
+// ═══════════════════════════════════════════
+//  CURATORS — SYNC
+// ═══════════════════════════════════════════
+
+async function syncCurators(userId) {
+  const selected = [...document.querySelectorAll("#u-curators input:checked")]
+    .map(el => el.value);
+
+  const existing    = allCurators.filter(c => c.user_id === userId).map(c => c.instrument_id);
+  const toAdd       = selected.filter(id => !existing.includes(id));
+  const toRemove    = existing.filter(id => !selected.includes(id));
+
+  await Promise.all([
+    ...toAdd.map(instrId =>
+      fetch(`${REST}/curators`, {
+        method:  "POST",
+        headers: HEADERS,
+        body:    JSON.stringify({ user_id: userId, instrument_id: instrId })
+      })
+    ),
+    ...toRemove.map(instrId =>
+      fetch(
+        `${REST}/curators?user_id=eq.${encodeURIComponent(userId)}&instrument_id=eq.${encodeURIComponent(instrId)}`,
+        { method: "DELETE", headers: HEADERS }
+      )
+    )
+  ]);
+}
+
+// ═══════════════════════════════════════════
+//  CURATOR — EDIT A USER'S PERMISSIONS
+//  (restricted modal: only curator's instruments,
+//   no name / password / role editing)
+// ═══════════════════════════════════════════
+
+let curatorPermUserId = null;
+
+function openEditUserPermissions(userId) {
+  curatorPermUserId = userId;
+  const u = allUsers.find(x => x.id === userId);
+
+  document.getElementById("curator-perm-title").textContent =
+    `Permissions — ${u?.name ?? "User"}`;
+
+  setModalAlert("modal-curator-perm-alert", "");
+
+  // Show which instruments this applies to
+  const instrNames = currentUserCuratorInstrIds
+    .map(id => allInstruments.find(i => i.id === id)?.name ?? id)
+    .join(", ");
+  const scopeEl = document.getElementById("curator-perm-scope");
+  scopeEl.textContent = `Editing access for your managed instrument${currentUserCuratorInstrIds.length !== 1 ? "s" : ""}: ${instrNames}`;
+  scopeEl.style.display = "";
+
+  buildPermItemsInto("curator-perm-items", userId, currentUserCuratorInstrIds, "permc-");
+  openModal("modal-curator-perm");
+}
+
+async function saveUserPermissions() {
+  const btn = document.getElementById("curator-perm-save-btn");
+  btn.disabled = true; btn.textContent = "Saving…";
+  setModalAlert("modal-curator-perm-alert", "");
+
+  try {
+    await syncPermissionsFromContainer(
+      curatorPermUserId,
+      "curator-perm-items",
+      "permc-",
+      currentUserCuratorInstrIds
+    );
+    const u = allUsers.find(x => x.id === curatorPermUserId);
+    toast(`Permissions updated for "${u?.name}"`);
+    closeModal("modal-curator-perm");
+    await loadAll();
+  } catch (e) {
+    setModalAlert("modal-curator-perm-alert", `Failed to save: ${e.message}`);
+  }
+
+  btn.disabled = false; btn.textContent = "Save Permissions";
+}
+
+// ═══════════════════════════════════════════
+//  USERS — DELETE
+// ═══════════════════════════════════════════
+
+function confirmDeleteUser(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+
+  document.getElementById("confirm-title").textContent   = "Delete User";
+  document.getElementById("confirm-message").textContent =
+    `Are you sure you want to delete "${u.name}"? Their record, permissions, and auth login will all ` +
+    `be removed. Existing bookings will remain. This cannot be undone.`;
+
+  document.getElementById("confirm-ok-btn").onclick = () => deleteUser(userId);
+  openModal("modal-confirm");
+}
+
+async function deleteUser(userId) {
+  const u = allUsers.find(x => x.id === userId);
+
+  // 1. Delete permissions
+  await fetch(
+    `${REST}/permissions?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+
+  // 2. Delete curator entries
+  await fetch(
+    `${REST}/curators?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+
+  // 3. Delete administrator entry if present
+  await fetch(
+    `${REST}/administrators?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+
+  // 4. Delete from users table
+  await fetch(
+    `${REST}/users?id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+
+  // 5. Delete from Supabase Auth
+  await sbAdmin.auth.admin.deleteUser(userId);
+
+  toast(`User "${u?.name}" deleted`);
+  closeModal("modal-confirm");
+  await loadAll();
+}
+
+// ═══════════════════════════════════════════
+//  INSTRUMENTS — RENDER
+// ═══════════════════════════════════════════
+
+function renderInstruments() {
+  const tbody = document.getElementById("instruments-tbody");
+
+  // Curators only see their assigned instruments
+  const visible = currentUserIsCurator
+    ? allInstruments.filter(i => currentUserCuratorInstrIds.includes(i.id))
+    : allInstruments;
+
+  if (!visible.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${
+      currentUserIsCurator ? "No instruments assigned to you." : "No instruments found."
+    }</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = visible.map(i => {
+    const operational = i.operational !== false;
+    const statusBadge = operational
+      ? `<span style="color:var(--success);font-family:var(--mono);font-size:11px">● Operational</span>`
+      : `<span style="color:var(--danger);font-family:var(--mono);font-size:11px">● Offline</span>`;
+
+    // Curators get Edit + Report; full admins get all three
+    const actionBtns = currentUserIsCurator
+      ? `<button class="btn btn-ghost btn-sm"
+                onclick="openEditInstrument('${esc(i.id)}')">Edit</button>
+         <button class="btn btn-report btn-sm" style="margin-left:6px"
+                onclick="openReport('${esc(i.id)}')">Usage Report</button>`
+      : `<button class="btn btn-ghost btn-sm"
+                onclick="openEditInstrument('${esc(i.id)}')">Edit</button>
+         <button class="btn btn-danger btn-sm" style="margin-left:6px"
+                onclick="confirmDeleteInstrument('${esc(i.id)}')">Delete</button>
+         <button class="btn btn-report btn-sm" style="margin-left:6px"
+                onclick="openReport('${esc(i.id)}')">Usage Report</button>`;
+
+    // Curator cell: first curator for this instrument, else first administrator, else —
+    const curatorEntry  = allCurators.find(c => c.instrument_id === i.id);
+    let curatorCell;
+    if (curatorEntry) {
+      const cu    = allUsers.find(u => u.id === curatorEntry.user_id);
+      const email = cu ? (cu.email || getAuthEmail(cu.id)) : null;
+      const name  = cu?.name ?? "Curator";
+      curatorCell = email
+        ? `<a class="mailto-link" href="mailto:${esc(email)}">${esc(name)}</a>`
+        : `<span style="font-size:13px">${esc(name)}</span>`;
+    } else {
+      // Fall back to first administrator
+      const adminEntry = allAdministrators[0];
+      const au    = adminEntry ? allUsers.find(u => u.id === adminEntry.user_id) : null;
+      const email = au ? (au.email || getAuthEmail(au.id)) : null;
+      const name  = au?.name ?? "Administrator";
+      curatorCell = au
+        ? (email
+            ? `<a class="mailto-link" href="mailto:${esc(email)}">${esc(name)}</a>`
+            : `<span style="font-size:13px">${esc(name)}</span>`)
+        : `<span class="tag-none">—</span>`;
+    }
+
+    return `
+    <tr>
+      <td style="color:var(--muted);font-family:var(--mono);font-size:12px">${i.sortorder ?? "—"}</td>
+      <td>
+        <strong>${esc(i.name)}</strong><br>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(i.id)}</span>
+      </td>
+      <td style="color:var(--muted);font-size:12px;max-width:200px">${esc(i.description || "—")}</td>
+      <td>${statusBadge}</td>
+      <td>${curatorCell}</td>
+      <td style="text-align:right;white-space:nowrap">${actionBtns}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ═══════════════════════════════════════════
+//  INSTRUMENTS — OPEN ADD
+// ═══════════════════════════════════════════
+
+function openAddInstrument() {
+  editingInstrId = null;
+
+  document.getElementById("modal-instr-title").textContent = "Add Instrument";
+  document.getElementById("i-save-btn").textContent        = "Create Instrument";
+  document.getElementById("i-id").disabled   = false;
+  document.getElementById("i-id").value          = "";
+  document.getElementById("i-name").value        = "";
+  document.getElementById("i-description").value = "";
+  document.getElementById("i-notes").value       = "";
+  document.getElementById("i-sortorder").value   = "";
+  document.getElementById("i-operational").checked = true;
+  updateOperationalLabel();
+
+  setModalAlert("modal-instr-alert", "");
+  openModal("modal-instrument");
+  setTimeout(() => document.getElementById("i-id").focus(), 60);
+}
+
+// ═══════════════════════════════════════════
+//  INSTRUMENTS — OPEN EDIT
+// ═══════════════════════════════════════════
+
+function openEditInstrument(instrId) {
+  const i = allInstruments.find(x => x.id === instrId);
+  if (!i) return;
+
+  editingInstrId = instrId;
+
+  document.getElementById("modal-instr-title").textContent = "Edit Instrument";
+  document.getElementById("i-save-btn").textContent        = "Save Changes";
+  document.getElementById("i-id").value          = i.id;
+  document.getElementById("i-id").disabled       = true;
+  document.getElementById("i-name").value        = i.name        || "";
+  document.getElementById("i-description").value = i.description || "";
+  document.getElementById("i-notes").value       = i.notes       || "";
+  document.getElementById("i-sortorder").value   = i.sortorder   ?? "";
+  document.getElementById("i-operational").checked = i.operational !== false;
+  updateOperationalLabel();
+
+  setModalAlert("modal-instr-alert", "");
+  openModal("modal-instrument");
+  setTimeout(() => document.getElementById("i-name").focus(), 60);
+}
+
+// ═══════════════════════════════════════════
+//  INSTRUMENTS — SAVE
+// ═══════════════════════════════════════════
+
+async function saveInstrument() {
+  const id          = document.getElementById("i-id").value.trim();
+  const name        = document.getElementById("i-name").value.trim();
+  const description = document.getElementById("i-description").value.trim();
+  const notes       = document.getElementById("i-notes").value.trim();
+  const operational = document.getElementById("i-operational").checked;
+  const sortorder   = document.getElementById("i-sortorder").value;
+  const btn         = document.getElementById("i-save-btn");
+
+  setModalAlert("modal-instr-alert", "");
+
+  if (!id)           { setModalAlert("modal-instr-alert", "Instrument ID is required."); return; }
+  if (!name)         { setModalAlert("modal-instr-alert", "Display name is required.");  return; }
+  if (/\s/.test(id)) { setModalAlert("modal-instr-alert", "Instrument ID cannot contain spaces."); return; }
+
+  const payload = {
+    name,
+    description: description || null,
+    notes:       notes       || null,
+    operational,
+    sortorder:   sortorder ? parseInt(sortorder) : null,
+  };
+
+  btn.disabled = true; btn.textContent = "Saving…";
+
+  if (!editingInstrId) {
+    payload.id = id;
+    const res = await fetch(`${REST}/instruments`, {
+      method: "POST", headers: HEADERS, body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setModalAlert("modal-instr-alert", err.message || "Failed to create instrument.");
+      btn.disabled = false; btn.textContent = "Create Instrument"; return;
+    }
+    toast(`Instrument "${name}" created`);
+  } else {
+    const res = await fetch(
+      `${REST}/instruments?id=eq.${encodeURIComponent(editingInstrId)}`,
+      { method: "PATCH", headers: HEADERS, body: JSON.stringify(payload) }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setModalAlert("modal-instr-alert", err.message || "Failed to update instrument.");
+      btn.disabled = false; btn.textContent = "Save Changes"; return;
+    }
+    toast(`Instrument "${name}" updated`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = editingInstrId ? "Save Changes" : "Create Instrument";
+  closeModal("modal-instrument");
+  await loadAll();
+}
+
+// ═══════════════════════════════════════════
+//  INSTRUMENTS — DELETE
+// ═══════════════════════════════════════════
+
+function confirmDeleteInstrument(instrId) {
+  const i = allInstruments.find(x => x.id === instrId);
+  if (!i) return;
+
+  document.getElementById("confirm-title").textContent   = "Delete Instrument";
+  document.getElementById("confirm-message").textContent =
+    `Are you sure you want to delete "${i.name}"? All user permissions and curator assignments for ` +
+    `this instrument will also be removed. Existing bookings will remain. This cannot be undone.`;
+
+  document.getElementById("confirm-ok-btn").onclick = () => deleteInstrument(instrId);
+  openModal("modal-confirm");
+}
+
+async function deleteInstrument(instrId) {
+  const i = allInstruments.find(x => x.id === instrId);
+
+  // Remove all permissions for this instrument
+  await fetch(
+    `${REST}/permissions?instrument_id=eq.${encodeURIComponent(instrId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+  // Remove all curator assignments for this instrument
+  await fetch(
+    `${REST}/curators?instrument_id=eq.${encodeURIComponent(instrId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+  // Delete the instrument itself
+  await fetch(
+    `${REST}/instruments?id=eq.${encodeURIComponent(instrId)}`,
+    { method: "DELETE", headers: HEADERS }
+  );
+
+  toast(`Instrument "${i?.name}" deleted`);
+  closeModal("modal-confirm");
+  await loadAll();
+}
+
+function updateOperationalLabel() {
+  const checked = document.getElementById("i-operational").checked;
+  document.getElementById("i-operational-label").textContent =
+    checked ? "Instrument is operational" : "Instrument is offline / unavailable";
+}
+
+// ═══════════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════════
+
+let reportInstrId = null;
+
+function openReport(instrId) {
+  reportInstrId = instrId;
+  const instr = allInstruments.find(i => i.id === instrId);
+  document.getElementById("report-title").textContent = `Usage Report — ${instr?.name ?? instrId}`;
+  document.getElementById("report-alert").innerHTML = "";
+
+  const now   = new Date();
+  const today = now.toISOString().split("T")[0];
+  const jan1  = `${now.getFullYear()}-01-01`;
+  document.getElementById("report-from").value = jan1;
+  document.getElementById("report-to").value   = today;
+
+  openModal("modal-report");
+}
+
+function getReportRows() {
+  const from   = document.getElementById("report-from").value;
+  const to     = document.getElementById("report-to").value;
+  const instr  = allInstruments.find(i => i.id === reportInstrId);
+
+  const rows = allBookings
+    .filter(b => {
+      if (b.instrument !== reportInstrId) return false;
+      if (from && b.date < from) return false;
+      if (to   && b.date > to)   return false;
+      return true;
+    })
+    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.hour - b.hour)
+    .map(b => ({
+      date:  b.date,
+      day:   new Date(b.date + "T12:00:00").toLocaleDateString("en-GB", {weekday:"short"}),
+      time:  b.hour.toString().padStart(2,"0") + ":00",
+      user:  b.name,
+    }));
+
+  return { rows, instr, from, to };
+}
+
+async function generateReport(format) {
+  const alertEl = document.getElementById("report-alert");
+  alertEl.innerHTML = "";
+
+  const fresh = await fetch(`${REST}/bookings?select=*&instrument=eq.${encodeURIComponent(reportInstrId)}`, { headers: HEADERS });
+  allBookings = await fresh.json();
+
+  const { rows, instr, from, to } = getReportRows();
+
+  if (!rows.length) {
+    alertEl.innerHTML = `<div class="alert alert-warning">No bookings found for this instrument in the selected date range.</div>`;
+    return;
+  }
+
+  const filename = `${instr?.id ?? "instrument"}_usage_${from}_to_${to}`;
+
+  if (format === "csv") {
+    generateCSV(rows, instr, from, to, filename);
+  } else {
+    generatePDF(rows, instr, from, to, filename);
+  }
+}
+
+function generateCSV(rows, instr, from, to, filename) {
+  const userTotals = {};
+  rows.forEach(r => { userTotals[r.user] = (userTotals[r.user] || 0) + 1; });
+
+  const lines = [
+    [`Usage Report — ${instr?.name ?? reportInstrId}`],
+    [`Period: ${from} to ${to}`],
+    [`Total bookings: ${rows.length}`],
+    [],
+    ["Date", "Day", "Time", "User"],
+    ...rows.map(r => [r.date, r.day, r.time, r.user]),
+    [],
+    ["Summary by user"],
+    ["User", "Hours booked"],
+    ...Object.entries(userTotals).sort((a,b)=>b[1]-a[1]).map(([u,n])=>[u,n]),
+  ];
+
+  const csv = lines.map(row =>
+    row.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+  ).join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename + ".csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function generatePDF(rows, instr, from, to, filename) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  const pageW  = doc.internal.pageSize.getWidth();
+  const margin = 18;
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Usage Report: ${instr?.name ?? reportInstrId}`, margin, 22);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 140);
+  doc.text(`Period: ${from}  →  ${to}     Total bookings: ${rows.length}`, margin, 30);
+  doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, margin, 35);
+  doc.setTextColor(0, 0, 0);
+
+  doc.autoTable({
+    startY: 42,
+    head:   [["Date", "Day", "Time", "User"]],
+    body:   rows.map(r => [r.date, r.day, r.time, r.user]),
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [79, 142, 247], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [245, 247, 255] },
+    margin: { left: margin, right: margin },
+  });
+
+  const userTotals = {};
+  rows.forEach(r => { userTotals[r.user] = (userTotals[r.user] || 0) + 1; });
+  const summaryRows = Object.entries(userTotals).sort((a,b)=>b[1]-a[1]).map(([u,n])=>[u, n]);
+
+  const afterTable = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Summary by User", margin, afterTable);
+
+  doc.autoTable({
+    startY: afterTable + 4,
+    head:   [["User", "Hours booked"]],
+    body:   summaryRows,
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [79, 142, 247], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [245, 247, 255] },
+    margin: { left: margin, right: margin },
+    columnStyles: { 1: { halign: "center" } },
+  });
+
+  doc.save(filename + ".pdf");
+}
+
+// ═══════════════════════════════════════════
+//  USER REPORTS
+// ═══════════════════════════════════════════
+
+let reportUserId = null;
+
+function openUserReport(userId) {
+  reportUserId = userId;
+  const u = allUsers.find(x => x.id === userId);
+  document.getElementById("user-report-title").textContent = `Usage Report — ${u?.name ?? "User"}`;
+  document.getElementById("user-report-alert").innerHTML = "";
+
+  // Curator: show which instruments this report covers
+  const scopeEl = document.getElementById("user-report-scope");
+  if (currentUserIsCurator) {
+    const instrNames = currentUserCuratorInstrIds
+      .map(id => allInstruments.find(i => i.id === id)?.name ?? id)
+      .join(", ");
+    scopeEl.textContent = `Filtered to your managed instrument${currentUserCuratorInstrIds.length !== 1 ? "s" : ""}: ${instrNames}`;
+    scopeEl.style.display = "";
+  } else {
+    scopeEl.style.display = "none";
+  }
+
+  const now   = new Date();
+  const today = now.toISOString().split("T")[0];
+  const jan1  = `${now.getFullYear()}-01-01`;
+  document.getElementById("user-report-from").value = jan1;
+  document.getElementById("user-report-to").value   = today;
+
+  openModal("modal-user-report");
+}
+
+function getUserReportRows() {
+  const from = document.getElementById("user-report-from").value;
+  const to   = document.getElementById("user-report-to").value;
+  const u    = allUsers.find(x => x.id === reportUserId);
+
+  const rows = allBookings
+    .filter(b => {
+      if (b.name !== u?.name) return false;
+      // Curators only see bookings on their managed instruments
+      if (currentUserIsCurator && !currentUserCuratorInstrIds.includes(b.instrument)) return false;
+      if (from && b.date < from) return false;
+      if (to   && b.date > to)   return false;
+      return true;
+    })
+    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.hour - b.hour)
+    .map(b => {
+      const instr = allInstruments.find(i => i.id === b.instrument);
+      return {
+        date:       b.date,
+        day:        new Date(b.date + "T12:00:00").toLocaleDateString("en-GB", {weekday:"short"}),
+        time:       b.hour.toString().padStart(2,"0") + ":00",
+        instrument: instr?.name ?? b.instrument,
+      };
+    });
+
+  return { rows, user: u, from, to };
+}
+
+async function generateUserReport(format) {
+  const alertEl = document.getElementById("user-report-alert");
+  alertEl.innerHTML = "";
+
+  const u = allUsers.find(x => x.id === reportUserId);
+  const fresh = await fetch(
+    `${REST}/bookings?select=*&name=eq.${encodeURIComponent(u?.name ?? "")}`,
+    { headers: HEADERS }
+  );
+  const userBookings = await fresh.json();
+  const saved = allBookings;
+  allBookings = userBookings;
+
+  const { rows, user, from, to } = getUserReportRows();
+  allBookings = saved;
+
+  if (!rows.length) {
+    alertEl.innerHTML = `<div class="alert alert-warning">No bookings found for this user in the selected date range.</div>`;
+    return;
+  }
+
+  const safeName = (user?.name ?? "user").replace(/[^a-z0-9]/gi, "_");
+  const filename = `${safeName}_usage_${from}_to_${to}`;
+
+  if (format === "csv") {
+    generateUserCSV(rows, user, from, to, filename);
+  } else {
+    generateUserPDF(rows, user, from, to, filename);
+  }
+}
+
+function generateUserCSV(rows, user, from, to, filename) {
+  const instrTotals = {};
+  rows.forEach(r => { instrTotals[r.instrument] = (instrTotals[r.instrument] || 0) + 1; });
+
+  const scopeLine = currentUserIsCurator
+    ? [`Instruments: ${currentUserCuratorInstrIds.map(id => allInstruments.find(i=>i.id===id)?.name ?? id).join(", ")}`]
+    : [];
+
+  const lines = [
+    [`Usage Report — ${user?.name ?? "User"}`],
+    [`Period: ${from} to ${to}`],
+    [`Total bookings: ${rows.length}`],
+    ...scopeLine.map(s => [s]),
+    [],
+    ["Date", "Day", "Time", "Instrument"],
+    ...rows.map(r => [r.date, r.day, r.time, r.instrument]),
+    [],
+    ["Summary by instrument"],
+    ["Instrument", "Hours booked"],
+    ...Object.entries(instrTotals).sort((a,b)=>b[1]-a[1]).map(([i,n])=>[i,n]),
+  ];
+
+  const csv = lines.map(row =>
+    row.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+  ).join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename + ".csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function generateUserPDF(rows, user, from, to, filename) {
+  const { jsPDF } = window.jspdf;
+  const doc    = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const margin = 18;
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Usage Report: ${user?.name ?? "User"}`, margin, 22);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 140);
+  doc.text(`Period: ${from}  →  ${to}     Total bookings: ${rows.length}`, margin, 30);
+  if (currentUserIsCurator) {
+    const names = currentUserCuratorInstrIds
+      .map(id => allInstruments.find(i => i.id === id)?.name ?? id).join(", ");
+    doc.text(`Instruments: ${names}`, margin, 35);
+    doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, margin, 40);
+  } else {
+    doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, margin, 35);
+  }
+  doc.setTextColor(0, 0, 0);
+
+  doc.autoTable({
+    startY: currentUserIsCurator ? 47 : 42,
+    head:   [["Date", "Day", "Time", "Instrument"]],
+    body:   rows.map(r => [r.date, r.day, r.time, r.instrument]),
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [79, 142, 247], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [245, 247, 255] },
+    margin: { left: margin, right: margin },
+  });
+
+  const instrTotals = {};
+  rows.forEach(r => { instrTotals[r.instrument] = (instrTotals[r.instrument] || 0) + 1; });
+  const summaryRows = Object.entries(instrTotals).sort((a,b)=>b[1]-a[1]).map(([i,n])=>[i,n]);
+
+  const afterTable = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Summary by Instrument", margin, afterTable);
+
+  doc.autoTable({
+    startY: afterTable + 4,
+    head:   [["Instrument", "Hours booked"]],
+    body:   summaryRows,
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [79, 142, 247], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [245, 247, 255] },
+    margin: { left: margin, right: margin },
+    columnStyles: { 1: { halign: "center" } },
+  });
+
+  doc.save(filename + ".pdf");
+}
+
+// ═══════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════
+
+function esc(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ═══════════════════════════════════════════
+//  BOOT — resume existing session
+// ═══════════════════════════════════════════
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    const res  = await fetch(`${REST}/users?id=eq.${session.user.id}&select=*`, { headers: HEADERS });
+    const rows = await res.json();
+    if (rows.length) {
+      const userRow = rows[0];
+
+      // Check administrators table
+      const adminRes  = await fetch(`${REST}/administrators?user_id=eq.${encodeURIComponent(userRow.id)}&select=*`, { headers: HEADERS });
+      const adminRows = await adminRes.json();
+
+      if (adminRows.length) {
+        currentUserIsCurator       = false;
+        currentUserCuratorInstrIds = [];
+        currentAdminUser = { ...userRow, email: session.user.email };
+        document.getElementById("topbar-user").innerHTML =
+          `Logged in as <strong>${esc(currentAdminUser.name)}</strong> <span class="badge-admin">Admin</span>`;
+        document.getElementById("login-screen").style.display = "none";
+        await loadAll();
+        applyRoleUI();
+      } else {
+        // Check curators table
+        const curRes  = await fetch(`${REST}/curators?user_id=eq.${encodeURIComponent(userRow.id)}&select=*`, { headers: HEADERS });
+        const curRows = await curRes.json();
+        if (curRows.length) {
+          currentUserIsCurator       = true;
+          currentUserCuratorInstrIds = curRows.map(r => r.instrument_id);
+          currentAdminUser = { ...userRow, email: session.user.email };
+          document.getElementById("topbar-user").innerHTML =
+            `Logged in as <strong>${esc(currentAdminUser.name)}</strong> <span class="badge-curator">Curator</span>`;
+          document.getElementById("login-screen").style.display = "none";
+          await loadAll();
+          applyRoleUI();
+        }
+      }
+    }
+  }
+})();
+</script>
+</body>
+</html>
