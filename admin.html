@@ -838,6 +838,28 @@ a.mailto-link:hover { text-decoration: underline; }
       </div>
 
     </div>
+
+    <!-- Read-only audit info — shown only when editing an existing user -->
+    <div id="u-meta-section" style="display:none;padding:0 28px 20px">
+      <hr class="form-divider" style="margin-top:0;margin-bottom:16px">
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Created by</label>
+          <div id="u-created-by" style="
+            background:var(--bg);border:1px solid var(--border);border-radius:8px;
+            padding:10px 14px;font-size:14px;color:var(--muted);font-family:var(--mono);
+            font-size:13px;letter-spacing:.01em">—</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Created at</label>
+          <div id="u-created-at" style="
+            background:var(--bg);border:1px solid var(--border);border-radius:8px;
+            padding:10px 14px;font-size:13px;color:var(--muted);font-family:var(--mono);
+            letter-spacing:.01em">—</div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-user')">Cancel</button>
       <button class="btn btn-primary" id="u-save-btn" onclick="saveUser()">Save User</button>
@@ -896,6 +918,16 @@ a.mailto-link:hover { text-decoration: underline; }
         <input id="i-sortorder" type="number" min="1" placeholder="e.g. 1" />
         <div class="form-hint">Lower numbers appear first</div>
       </div>
+
+      <div class="form-group">
+        <label>Instrument Image <span style="font-family:var(--sans);font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px">— PNG only</span></label>
+        <input id="i-image" type="file" accept=".png,image/png"
+               style="width:100%;background:var(--bg);border:1px solid var(--border);
+                      border-radius:8px;color:var(--text);font-family:var(--sans);
+                      font-size:13px;padding:9px 14px;cursor:pointer;" />
+        <div class="form-hint" id="i-image-hint"></div>
+      </div>
+
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-instrument')">Cancel</button>
@@ -1432,6 +1464,7 @@ function openAddUser() {
   buildPermItemsInto("u-permissions", null, null, "perm-");
   buildPermItemsInto("u-permissions-extra", null, allInstruments.map(i => i.id), "permx-");
   buildCuratorChips(null);
+  document.getElementById("u-meta-section").style.display = "none";
   openModal("modal-user");
   setTimeout(() => document.getElementById("u-name").focus(), 60);
 }
@@ -1466,6 +1499,20 @@ function openEditUser(userId) {
   buildPermItemsInto("u-permissions", userId, null, "perm-");
   buildPermItemsInto("u-permissions-extra", userId, otherIds, "permx-");
   buildCuratorChips(userId);
+
+  // Populate read-only audit fields
+  const metaSection = document.getElementById("u-meta-section");
+  metaSection.style.display = "";
+  document.getElementById("u-created-by").textContent =
+    u.created_by ? u.created_by : "—";
+  document.getElementById("u-created-at").textContent =
+    u.created_at
+      ? new Date(u.created_at).toLocaleString("en-GB", {
+          day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit"
+        })
+      : "—";
+
   openModal("modal-user");
   setTimeout(() => document.getElementById("u-name").focus(), 60);
 }
@@ -1639,7 +1686,13 @@ async function saveUser() {
     const insertRes = await fetch(`${REST}/users`, {
       method:  "POST",
       headers: HEADERS,
-      body:    JSON.stringify({ id: authId, name, email })
+      body:    JSON.stringify({
+        id: authId,
+        name,
+        email,
+        created_by: currentAdminUser.name,
+        created_at: new Date().toISOString()
+      })
     });
 
     if (!insertRes.ok) {
@@ -2018,7 +2071,13 @@ async function saveCuratorUser() {
   const insertRes = await fetch(`${REST}/users`, {
     method:  "POST",
     headers: HEADERS,
-    body:    JSON.stringify({ id: authId, name, email })
+    body:    JSON.stringify({
+      id: authId,
+      name,
+      email,
+      created_by: currentAdminUser.name,
+      created_at: new Date().toISOString()
+    })
   });
 
   if (!insertRes.ok) {
@@ -2130,6 +2189,8 @@ function openAddInstrument() {
   document.getElementById("i-sortorder").value   = "";
   document.getElementById("i-operational").checked = true;
   updateOperationalLabel();
+  document.getElementById("i-image").value   = "";
+  document.getElementById("i-image-hint").textContent = "";
 
   setModalAlert("modal-instr-alert", "");
   openModal("modal-instrument");
@@ -2156,10 +2217,35 @@ function openEditInstrument(instrId) {
   document.getElementById("i-sortorder").value   = i.sortorder   ?? "";
   document.getElementById("i-operational").checked = i.operational !== false;
   updateOperationalLabel();
+  document.getElementById("i-image").value = "";
+  document.getElementById("i-image-hint").textContent = "Leave empty to keep the existing image.";
 
   setModalAlert("modal-instr-alert", "");
   openModal("modal-instrument");
   setTimeout(() => document.getElementById("i-name").focus(), 60);
+}
+
+// ═══════════════════════════════════════════
+//  INSTRUMENTS — IMAGE UPLOAD
+// ═══════════════════════════════════════════
+
+async function uploadInstrumentImage(instrId) {
+  const fileInput = document.getElementById("i-image");
+  const file = fileInput.files[0];
+  if (!file) return;   // no file chosen — leave existing image untouched
+
+  const { error } = await sbAdmin.storage
+    .from("instrument-images")
+    .upload(`${instrId}.png`, file, {
+      contentType: "image/png",
+      upsert: true          // overwrites if an image already exists
+    });
+
+  if (error) {
+    // Non-fatal: instrument was saved; just warn about the image
+    setModalAlert("modal-instr-alert",
+      `Instrument saved, but image upload failed: ${error.message}`);
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -2201,6 +2287,7 @@ async function saveInstrument() {
       setModalAlert("modal-instr-alert", err.message || "Failed to create instrument.");
       btn.disabled = false; btn.textContent = "Create Instrument"; return;
     }
+    await uploadInstrumentImage(id);
     toast(`Instrument "${name}" created`);
   } else {
     const res = await fetch(
@@ -2212,6 +2299,7 @@ async function saveInstrument() {
       setModalAlert("modal-instr-alert", err.message || "Failed to update instrument.");
       btn.disabled = false; btn.textContent = "Save Changes"; return;
     }
+    await uploadInstrumentImage(editingInstrId);
     toast(`Instrument "${name}" updated`);
   }
 
